@@ -1,5 +1,9 @@
 (ns disc-message-db.core
-  (:require [asami.core :as d])
+  (:require [asami.core :as d]
+            [asami-loom.index :as lidx]
+            [asami-loom.label :as label]
+            [loom.io :as loom-io]
+            )
   (:gen-class))
 
 
@@ -214,14 +218,34 @@
 ;; => ("ServiceStatus" "DiscNotification" "DiscCommandAck" "UpdateLayoutConfiguration" "LayoutConfiguration" "LayoutConfigurationResponse" "DiscCommand" "LayoutConfigurationRequest")
 
 ;; find all messages
-
+       :where [_ _ ?m]
 (count (d/q '[:find [?m ...]
               :where [_ _ ?m]
               ] db))
-;; => ("ServiceStatus" "DiscNotification" "DiscCommandAck" "UpdateLayoutConfiguration" "LayoutConfiguration" "LayoutConfigurationResponse" "DiscCommand" "LayoutConfigurationRequest" "InactiveNode" "LostNode" "InactiveService" "LostService" "NodeStatus" "StartCluster" "RequestClusterConfiguration" "ShutdownCluster" "BridgeStatus" "UpdateClusterConfiguration" "ClusterOperationalStatus" "ApplicationStatus" "RestartCluster" "Notification" "ClusterConfiguration" "RequestNodeAction" "RequestDataUpdate" "SetNotificationLevel" "ClusterStatus" "RequestServiceAction" "SetClusterConfiguration" "ShutdownApplication" "LaunchApplication" "LaunchService" "LaunchServiceResponse" "ShutdownApplicationResponse" "LaunchApplicationResponse")
-;; => 35
 
 
+;; use loom to generate graph
+
+(def graph (d/graph (d/db conn)))
+
+(defn edge-label
+  [g s d]
+  (str (d/q '[:find ?edge . :in $ ?a ?b :where (or [?a ?edge ?b] [?b ?edge ?a])] g s d)))
+
+(defn node-label
+  [g n]
+  (let [id (d/q [:find '?id '. :where [n :db/ident '?id]] g)]
+    (cond id (str id)
+          (and (keyword? n) (= (namespace n) "tg")) (str ":" (name n))
+          :default (str n))))
+
+
+
+(loom-io/view graph :fmt :png :alg :sfdp :edge-label (partial edge-label graph) :node-label (partial node-label graph))
+
+(loom-io/dot graph "resources/graph.gv")
+(loom-io/dot graph "resources/graph2.gv")
+(loom-io/view graph)
 
 (defn -main
   "I don't do a whole lot ... yet."

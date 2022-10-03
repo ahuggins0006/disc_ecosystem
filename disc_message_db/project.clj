@@ -5,6 +5,8 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.clojars.quoll/asami "2.3.2"]
+                 [org.clojars.quoll/asami-loom "0.3.1"]
+                 [aysylu/loom "1.0.0"]
                  ]
   :main ^:skip-aot disc-message-db.core
   :target-path "target/%s"
