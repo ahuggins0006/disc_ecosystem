@@ -10,52 +10,14 @@
   (:gen-class))
 
 
-;; Create an in-memory database, named dbname
-;;(def db-uri "asami:mem://dbname")
-(def db-uri "asami:mem://disc-eco")
+;; create db
+(def db-uri "asami:mem://disc-message-eco")
 (d/create-database db-uri)
 
 ;; Create a connection to the database
 (def conn-disc (d/connect db-uri))
 
-;; Data can be loaded into a database either as objects, or "add" statements:
-(def first-movies [{:movie/title "Explorers"
-                    :movie/genre "adventure/comedy/family"
-                    :movie/release-year 1985}
-                   {:movie/title "Demolition Man"
-                    :movie/genre "action/sci-fi/thriller"
-                    :movie/release-year 1993}
-                   {:movie/title "Johnny Mnemonic"
-                    :movie/genre "cyber-punk/action"
-                    :movie/release-year 1995}
-                   {:movie/title "Toy Story"
-                    :movie/genre "animation/adventure"
-                    :movie/release-year 1995}])
-
-@(d/transact conn {:tx-data first-movies})
-
 (def db (d/db conn-disc))
-
-(d/q '[:find ?movie-title
-       :where [?m :movie/title ?movie-title]] db)
-;; => (["Explorers"] ["Demolition Man"] ["Johnny Mnemonic"] ["Toy Story"])
-
-(d/q '[:find ?title ?year ?genre
-       :where [?m :movie/title ?title]
-              [?m :movie/release-year ?year]
-              [?m :movie/genre ?genre]
-              [(> ?year 1990)]
-       ] db)
-
-;; triples
-
-(def work-tree [[:A :title "CEO"]
-                [:B :title "CTO"]
-                [:C :title "Engineering Manager"]
-                [:D :title "QA Engineer"]
-                [:E :title "Engineer"]])
-
-@(d/transact conn {:tx-triples work-tree})
 
 
 ;; try a concrete example
@@ -177,9 +139,13 @@
                [:cluster-controller :handles "LostService"]])
 
 
+;; TODO move publishers and handlers to separate namespace
+@(d/transact conn-disc {:tx-triples publishers})
+@(d/transact conn-disc {:tx-triples handlers})
 
-@(d/transact conn {:tx-triples publishers})
-@(d/transact conn {:tx-triples handlers})
+;; sample queuries
+;; TODO move queries to another namespace
+
 
 ;; find services who publish ServiceStatus
 
@@ -235,27 +201,6 @@
 (d/create-database "asami:mem://music")
 (def conn (d/connect "asami:mem://music"))
 
-(def data
-  [{:db/ident "paul"
-    :artist/name "Paul McCartney"}
-   {:db/ident "george"
-    :artist/name "George Harrison"}
-   {:db/ident "john"
-    :artist/name "John Lennon"}
-   {:release/artists {:db/ident "paul"}
-    :release/name "My Sweet Lord"}
-   {:release/artists {:db/ident "george"}
-    :release/name "Electronic Sound"}
-   {:release/artists {:db/ident "george"}
-    :release/name "Give Me Love (Give Me Peace on Earth)"}
-   {:release/artists {:db/ident "george"}
-    :release/name "All Things Must Pass"}
-   {:release/artists {:db/ident "john"}
-    :release/name "Imagine"}])
-
-(d/transact conn {:tx-data data})
-
-
 
 (def work-tree [[:A :title "CEO"]
                 [:B :title "CTO"]
@@ -292,8 +237,6 @@
 
 (loom-io/view g)
 
-;; TODO convert disc message db using the above recipe
-
 (def graph-disc (d/graph (d/db conn-disc)))
 
 (count (:spot graph-disc))
@@ -301,6 +244,7 @@
 (def g-disc (build-graph-spot graph-disc))
 (loom-io/view g-disc)
 
+;; loom graph example
 (def g (loom-g/graph [1 2] [2 3] {3 [4] 5 [6 7]} 7 8 9))
 (loom-io/view g)
 
