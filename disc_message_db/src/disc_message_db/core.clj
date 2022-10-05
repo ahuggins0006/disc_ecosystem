@@ -1,8 +1,11 @@
 (ns disc-message-db.core
   (:require [asami.core :as d]
-            [asami-loom.index :as lidx]
+            [asami-loom.multi-graph :as mg]
+            [asami-loom.index :as loom-idx]
             [asami-loom.label :as label]
             [loom.io :as loom-io]
+            [loom.graph :as loom-g]
+            [loom.gen :as loom-gen]
             )
   (:gen-class))
 
@@ -13,7 +16,7 @@
 (d/create-database db-uri)
 
 ;; Create a connection to the database
-(def conn (d/connect db-uri))
+(def conn-disc (d/connect db-uri))
 
 ;; Data can be loaded into a database either as objects, or "add" statements:
 (def first-movies [{:movie/title "Explorers"
@@ -31,7 +34,7 @@
 
 @(d/transact conn {:tx-data first-movies})
 
-(def db (d/db conn))
+(def db (d/db conn-disc))
 
 (d/q '[:find ?movie-title
        :where [?m :movie/title ?movie-title]] db)
@@ -226,30 +229,85 @@
 
 ;; use loom to generate graph
 
+
+;; asami loom example
+
+(d/create-database "asami:mem://music")
+(def conn (d/connect "asami:mem://music"))
+
+(def data
+  [{:db/ident "paul"
+    :artist/name "Paul McCartney"}
+   {:db/ident "george"
+    :artist/name "George Harrison"}
+   {:db/ident "john"
+    :artist/name "John Lennon"}
+   {:release/artists {:db/ident "paul"}
+    :release/name "My Sweet Lord"}
+   {:release/artists {:db/ident "george"}
+    :release/name "Electronic Sound"}
+   {:release/artists {:db/ident "george"}
+    :release/name "Give Me Love (Give Me Peace on Earth)"}
+   {:release/artists {:db/ident "george"}
+    :release/name "All Things Must Pass"}
+   {:release/artists {:db/ident "john"}
+    :release/name "Imagine"}])
+
+(d/transact conn {:tx-data data})
+
+
+
+(def work-tree [[:A :title "CEO"]
+                [:B :title "CTO"]
+                [:F :title "CTO"]
+                [:C :title "Engineering Manager"]
+                [:D :title "QA Engineer"]
+                [:E :title "Engineer"]])
+
+@(d/transact conn {:tx-triples work-tree})
+
 (def graph (d/graph (d/db conn)))
 
-(defn edge-label
-  [g s d]
-  (str (d/q '[:find ?edge . :in $ ?a ?b :where (or [?a ?edge ?b] [?b ?edge ?a])] g s d)))
+(count data)
+(keys (:spo graph))
+(keys graph)
+;; => (:spo :pos :spot :tconj)
+(count (:spo graph))
 
-(defn node-label
-  [g n]
-  (let [id (d/q [:find '?id '. :where [n :db/ident '?id]] g)]
-    (cond id (str id)
-          (and (keyword? n) (= (namespace n) "tg")) (str ":" (name n))
-          :default (str n))))
+;;(def g (apply loom-g/graph (map (fn ([[a _ c _]] [a c])) (:spot graph))))
 
+(def g (->> graph
+            :spot
+            (map (fn ([[a _ c _]] [a c])))
+            (apply loom-g/graph)
+            ))
 
+(defn build-graph-spot [graph]
+  (->> graph
+       :spot
+       (map (fn ([[a _ c _]] [a c])))
+       (apply loom-g/graph)
+       )
+  )
 
-(loom-io/view graph :fmt :png :alg :sfdp :edge-label (partial edge-label graph) :node-label (partial node-label graph))
+(loom-io/view g)
 
-(loom-io/dot graph "resources/graph.gv")
-(loom-io/dot graph "resources/graph2.gv")
-(loom-io/view graph)
+;; TODO convert disc message db using the above recipe
+
+(def graph-disc (d/graph (d/db conn-disc)))
+
+(count (:spot graph-disc))
+
+(def g-disc (build-graph-spot graph-disc))
+(loom-io/view g-disc)
+
+(def g (loom-g/graph [1 2] [2 3] {3 [4] 5 [6 7]} 7 8 9))
+(loom-io/view g)
+
+(loom-g/edges g)
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
   (println "Hello, World!"))
-;; => #'disc-message-db.core/-main
 
